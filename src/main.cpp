@@ -14,7 +14,7 @@
 #define DEBUG_FLAG              0   // Debug flag for image channels
 #define NUM_AREA_BINS           21  // Number of bins
 #define BIN_AREA                25  // Bin area
-#define ROI_FACTOR              3   // ROI of cell = ROI factor x mean diameter
+#define ROI_FACTOR              8   // ROI of cell = ROI factor x mean diameter
 #define MIN_CELL_ARC_LENGTH     250 // Cell arc length
 
 /* Channel type */
@@ -190,9 +190,7 @@ void separationMetrics( std::vector<std::vector<cv::Point>> contours,
                         float *mean_diameter,
                         float *stddev_diameter,
                         float *mean_aspect_ratio,
-                        float *stddev_aspect_ratio,
-                        float *mean_proximity_cnt,
-                        float *stddev_proximity_cnt ) {
+                        float *stddev_aspect_ratio  ) {
 
     // Compute the normal distribution parameters of cells
     std::vector<cv::Point2f> mc(contours.size());
@@ -220,13 +218,29 @@ void separationMetrics( std::vector<std::vector<cv::Point>> contours,
     cv::meanStdDev(aspect_ratio, mean_ratio, stddev_ratio);
     *mean_aspect_ratio = static_cast<float>(mean_ratio.val[0]);
     *stddev_aspect_ratio = static_cast<float>(stddev_ratio.val[0]);
+}
 
-    float roi = (ROI_FACTOR * mean_dia.val[0])/2;
-    std::vector<float> count(contours.size(), 0.0);
-    for (size_t i = 0; i < contours.size(); i++) {
-        for (size_t j = 0; j < contours.size(); j++) {
-            if (i == j) continue;
-            if (cv::norm(mc[i]-mc[j]) <= roi) {
+/* ROI metrics */
+void neuralROIMetrics(  std::vector<std::vector<cv::Point>> neural_contours, 
+                        std::vector<std::vector<cv::Point>> astrocyte_contours, 
+                        float mean_neural_dia, 
+                        float *mean_proximity_cnt, 
+                        float *stddev_proximity_cnt ) {
+
+    float roi = (ROI_FACTOR * mean_neural_dia)/2;
+    std::vector<float> count(neural_contours.size(), 0.0);
+
+    for (size_t i = 0; i < neural_contours.size(); i++) {
+
+        cv::Moments mu_neural = moments(neural_contours[i], true);
+        cv::Point2f mc_neural = cv::Point2f(static_cast<float>(mu_neural.m10/mu_neural.m00), 
+                                            static_cast<float>(mu_neural.m01/mu_neural.m00));
+        for (size_t j = 0; j < astrocyte_contours.size(); j++) {
+            cv::Moments mu_astrocyte = moments(astrocyte_contours[i], true);
+            cv::Point2f mc_astrocyte = 
+                        cv::Point2f(static_cast<float>(mu_astrocyte.m10/mu_astrocyte.m00),
+                                    static_cast<float>(mu_astrocyte.m01/mu_astrocyte.m00));
+            if (cv::norm(mc_neural-mc_astrocyte) <= roi) {
                 count[i]++;
             }
         }
@@ -418,25 +432,26 @@ bool processDir(std::string path, std::string image_name, std::string metrics_fi
         // Separation metrics for neural cells
         float mean_dia = 0.0, stddev_dia = 0.0;
         float mean_aspect_ratio = 0.0, stddev_aspect_ratio = 0.0;
-        float mean_proximity_cnt = 0.0, stddev_proximity_cnt = 0.0;
         separationMetrics(  neural_contours, 
                             &mean_dia, &stddev_dia, 
-                            &mean_aspect_ratio, &stddev_aspect_ratio, 
-                            &mean_proximity_cnt, &stddev_proximity_cnt  );
+                            &mean_aspect_ratio, &stddev_aspect_ratio    );
         data_stream << mean_dia << "," << stddev_dia << "," 
-                    << mean_aspect_ratio << "," << stddev_aspect_ratio << ","
-                    << mean_proximity_cnt << "," << stddev_proximity_cnt << ",";
+                    << mean_aspect_ratio << "," << stddev_aspect_ratio << ",";
+        float mean_neural_dia = mean_dia;
 
         // Separation metrics for astrocytes
-        mean_dia = stddev_dia = mean_aspect_ratio = stddev_aspect_ratio = 
-                                mean_proximity_cnt = stddev_proximity_cnt = 0.0;
+        mean_dia = stddev_dia = mean_aspect_ratio = stddev_aspect_ratio = 0.0;
         separationMetrics(  astrocyte_contours, 
                             &mean_dia, &stddev_dia, 
-                            &mean_aspect_ratio, &stddev_aspect_ratio, 
-                            &mean_proximity_cnt, &stddev_proximity_cnt  );
+                            &mean_aspect_ratio, &stddev_aspect_ratio    );
         data_stream << mean_dia << "," << stddev_dia << "," 
-                    << mean_aspect_ratio << "," << stddev_aspect_ratio << ","
-                    << mean_proximity_cnt << "," << stddev_proximity_cnt << ",";
+                    << mean_aspect_ratio << "," << stddev_aspect_ratio << ",";
+
+        // ROI metrics for neural cells
+        float mean_proximity_cnt = 0.0, stddev_proximity_cnt = 0.0;
+        neuralROIMetrics(   neural_contours, astrocyte_contours, mean_neural_dia, 
+                                        &mean_proximity_cnt, &stddev_proximity_cnt );
+        data_stream << mean_proximity_cnt << "," << stddev_proximity_cnt << ",";
 
         // Segment the green-red intersection
         cv::Mat green_red_segmented;
@@ -486,16 +501,24 @@ bool processDir(std::string path, std::string image_name, std::string metrics_fi
         cv::merge(merge_enhanced, color_enhanced);
         std::string out_enhanced = out_directory + "zlayer_" + 
                         std::to_string(z_index) + "_b_enhanced.tif";
-        cv::imwrite(out_enhanced.c_str(), color_enhanced);
+        //cv::imwrite(out_enhanced.c_str(), color_enhanced);
 
         /* Analyzed image */
         cv::Mat drawing_blue  = cv::Mat::zeros(blue_enhanced.size(), CV_8UC1);
         cv::Mat drawing_green = green;
         cv::Mat drawing_red   = red;
 
-        // Draw cell boundaries
-        for (size_t i = 0; i < contours_blue_filtered.size(); i++) {
-            cv::RotatedRect min_ellipse = fitEllipse(cv::Mat(contours_blue_filtered[i]));
+        // Draw neural cell boundaries
+        for (size_t i = 0; i < neural_contours.size(); i++) {
+            cv::RotatedRect min_ellipse = fitEllipse(cv::Mat(neural_contours[i]));
+            ellipse(drawing_blue, min_ellipse, 255, 4, 8);
+            ellipse(drawing_green, min_ellipse, 255, 4, 8);
+            ellipse(drawing_red, min_ellipse, 255, 4, 8);
+        }
+
+        // Draw astrocyte boundaries
+        for (size_t i = 0; i < astrocyte_contours.size(); i++) {
+            cv::RotatedRect min_ellipse = fitEllipse(cv::Mat(astrocyte_contours[i]));
             ellipse(drawing_blue, min_ellipse, 255, 4, 8);
             ellipse(drawing_green, min_ellipse, 255, 4, 8);
             ellipse(drawing_red, min_ellipse, 0, 4, 8);
@@ -557,10 +580,9 @@ int main(int argc, char *argv[]) {
     data_stream << "Image,Z Layer,Cell Count,Neural Cell Count,Astrocyte Count,\
                     Neural Cell Diameter (mean),Neural Cell Diameter (std. dev.),\
                     Neural Cell Aspect Ratio (mean),Neural Cell Aspect Ratio (std. dev.),\
-                    ROI Neural Cell Count (mean),ROI Neural Cell Count (std. dev.),\
                     Astrocyte Diameter (mean),Astrocyte Diameter (std. dev.),\
                     Astrocyte Aspect Ratio (mean),Astrocyte Aspect Ratio (std. dev.),\
-                    ROI Astrocyte Count (mean),ROI Astrocyte Count (std. dev.),";
+                    Neural ROI Count (mean),Neural ROI Count (std. dev.),";
 
     data_stream << "Green-Red Contour Count,";
     for (unsigned int i = 0; i < NUM_AREA_BINS-1; i++) {
