@@ -7,8 +7,9 @@
 instructions for installation on Linux at http://opencv.org/. Add to 
 ~/.bashrc **export LD\_LIBRARY\_PATH=${LD\_LIBRARY\_PATH}:/usr/local/lib**. 
 To test sample opencv code, compile using 
-**g++ &lt; file\_name > ``pkg-config opencv --cflags --libs``**
-
+```c++
+**g++ &lt; file\_name > `pkg-config opencv --cflags --libs`**
+```
 
 ##Build and run microglia analysis package
 
