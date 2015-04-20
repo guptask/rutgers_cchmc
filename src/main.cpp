@@ -431,7 +431,6 @@ bool processDir(std::string path, std::string image_name, std::string metrics_fi
 
 
         data_stream << std::endl;
-        data_stream.close();
 
         /* Enhanced image */
         std::vector<cv::Mat> merge_enhanced;
@@ -445,9 +444,9 @@ bool processDir(std::string path, std::string image_name, std::string metrics_fi
         cv::imwrite(out_enhanced.c_str(), color_enhanced);
 
         /* Analyzed image */
-        cv::Mat drawing_blue  = blue_enhanced;
-        cv::Mat drawing_green = cv::Mat::zeros(green_enhanced.size(), CV_8UC1);
-        cv::Mat drawing_red   = red_high_enhanced;
+        cv::Mat drawing_blue  = cv::Mat::zeros(blue_enhanced.size(), CV_8UC1);
+        cv::Mat drawing_green = green;
+        cv::Mat drawing_red   = red;
 
         // Draw cell boundaries
         for (size_t i = 0; i < contours_blue_filtered.size(); i++) {
@@ -468,6 +467,8 @@ bool processDir(std::string path, std::string image_name, std::string metrics_fi
                         std::to_string(z_index) + "_c_analyzed.tif";
         cv::imwrite(out_analyzed.c_str(), color_analyzed);
     }
+    data_stream.close();
+
     return true;
 }
 
