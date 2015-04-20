@@ -2,7 +2,7 @@
 
 ##Packages to install
 
-+ ###opencv: 
+###opencv: 
 >Clone the opencv repo at https://github.com/Itseez/opencv. Follow the 
 instructions for installation on Linux at http://opencv.org/. Add to 
 ~/.bashrc :
