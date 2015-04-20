@@ -16,7 +16,7 @@ To test sample opencv code, compile using
 A binary called **analyze** will be created.
 
 + Command to run the software: 
-**./analyze "image directory path with / at end"**
+**./analyze &lt; image directory path with / at end >**
 
 + Image directory path should have a **original** directory which contains the 
 separate tiff images for the RGB layers.
