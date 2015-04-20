@@ -7,7 +7,7 @@
 instructions for installation on Linux at http://opencv.org/. Add to 
 ~/.bashrc **export LD\_LIBRARY\_PATH=${LD\_LIBRARY\_PATH}:/usr/local/lib**. 
 To test sample opencv code, compile using 
-g++ <file\_name> `pkg-config opencv --cflags --libs`
+**g++ "file\_name" `pkg-config opencv --cflags --libs`**
 
 
 ##Build and run microglia analysis package
@@ -16,7 +16,7 @@ g++ <file\_name> `pkg-config opencv --cflags --libs`
 A binary called **analyze** will be created.
 
 + Command to run the software: 
-**./analyze <image directory path with / at end>**
+**./analyze "image directory path with / at end"**
 
 + Image directory path should have a **original** directory which contains the 
 separate tiff images for the RGB layers.
