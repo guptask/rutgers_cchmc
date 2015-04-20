@@ -159,6 +159,32 @@ void filterCells(   std::vector<std::vector<cv::Point>> blue_contours,
     }
 }
 
+/* Classify cells as neural cells or astrocytes */
+void classifyCells( std::vector<std::vector<cv::Point>> filtered_blue_contours, 
+                    cv::Mat blue_green_intersection,
+                    std::vector<std::vector<cv::Point>> *neural_contours,
+                    std::vector<std::vector<cv::Point>> *astrocyte_contours ) {
+
+    for (size_t i = 0; i < filtered_blue_contours.size(); i++) {
+
+        // Determine whether neural cell by calculating blue-green coverage area
+        std::vector<std::vector<cv::Point>> specific_contour (1, filtered_blue_contours[i]);
+        cv::Mat drawing = cv::Mat::zeros(blue_green_intersection.size(), CV_8UC1);
+        drawContours(drawing, specific_contour, -1, cv::Scalar::all(255), cv::FILLED, 
+                                    cv::LINE_8, std::vector<cv::Vec4i>(), 0, cv::Point());
+        int contour_count_before = countNonZero(drawing);
+        cv::Mat contour_intersection;
+        bitwise_and(drawing, blue_green_intersection, contour_intersection);
+        int contour_count_after = countNonZero(contour_intersection);
+        float coverage_ratio = ((float)contour_count_after)/contour_count_before;
+        if (coverage_ratio < 0.20) {
+            astrocyte_contours->push_back(filtered_blue_contours[i]);
+        } else {
+            neural_contours->push_back(filtered_blue_contours[i]);
+        }
+    }
+}
+
 /* Separation metrics */
 void separationMetrics( std::vector<std::vector<cv::Point>> contours, 
                         float *mean_diameter,
@@ -382,6 +408,11 @@ bool processDir(std::string path, std::string image_name, std::string metrics_fi
         filterCells(contours_blue, blue_contour_mask, &contours_blue_filtered);
         data_stream << contours_blue_filtered.size() << ",";
 
+        // Classify the filtered cells as neural cells or astrocytes
+        std::vector<std::vector<cv::Point>> neural_contours, astrocyte_contours;
+        classifyCells(contours_blue_filtered, blue_green_intersection, 
+                                        &neural_contours, &astrocyte_contours);
+
         // Separation metrics
         float mean_dia = 0.0, stddev_dia = 0.0;
         float mean_aspect_ratio = 0.0, stddev_aspect_ratio = 0.0;
@@ -429,8 +460,9 @@ bool processDir(std::string path, std::string image_name, std::string metrics_fi
                         &green_red_high_bins, &green_red_high_cnt);
         data_stream << green_red_high_cnt << "," << green_red_high_bins;
 
-
+        // End of output data for this image
         data_stream << std::endl;
+
 
         /* Enhanced image */
         std::vector<cv::Mat> merge_enhanced;
