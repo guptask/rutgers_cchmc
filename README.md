@@ -14,7 +14,7 @@ To test sample opencv code, compile using
 g++ < file_name > `pkg-config opencv --cflags --libs`
 ```
 
-##Build and run microglia analysis package
+##Build and run image analysis package
 
 + Inside the project root directory, type **make** to build the project.
 A binary called **analyze** will be created.
