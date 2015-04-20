@@ -406,18 +406,31 @@ bool processDir(std::string path, std::string image_name, std::string metrics_fi
         // Filter the blue contours
         std::vector<std::vector<cv::Point>> contours_blue_filtered;
         filterCells(contours_blue, blue_contour_mask, &contours_blue_filtered);
-        data_stream << contours_blue_filtered.size() << ",";
 
         // Classify the filtered cells as neural cells or astrocytes
         std::vector<std::vector<cv::Point>> neural_contours, astrocyte_contours;
         classifyCells(contours_blue_filtered, blue_green_intersection, 
                                         &neural_contours, &astrocyte_contours);
+        data_stream << contours_blue_filtered.size() << "," 
+                    << neural_contours.size() << "," 
+                    << astrocyte_contours.size() << ",";
 
-        // Separation metrics
+        // Separation metrics for neural cells
         float mean_dia = 0.0, stddev_dia = 0.0;
         float mean_aspect_ratio = 0.0, stddev_aspect_ratio = 0.0;
         float mean_proximity_cnt = 0.0, stddev_proximity_cnt = 0.0;
-        separationMetrics(  contours_blue_filtered, 
+        separationMetrics(  neural_contours, 
+                            &mean_dia, &stddev_dia, 
+                            &mean_aspect_ratio, &stddev_aspect_ratio, 
+                            &mean_proximity_cnt, &stddev_proximity_cnt  );
+        data_stream << mean_dia << "," << stddev_dia << "," 
+                    << mean_aspect_ratio << "," << stddev_aspect_ratio << ","
+                    << mean_proximity_cnt << "," << stddev_proximity_cnt << ",";
+
+        // Separation metrics for astrocytes
+        mean_dia = stddev_dia = mean_aspect_ratio = stddev_aspect_ratio = 
+                                mean_proximity_cnt = stddev_proximity_cnt = 0.0;
+        separationMetrics(  astrocyte_contours, 
                             &mean_dia, &stddev_dia, 
                             &mean_aspect_ratio, &stddev_aspect_ratio, 
                             &mean_proximity_cnt, &stddev_proximity_cnt  );
@@ -541,10 +554,13 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    data_stream << "Image,Z Layer,Cell Count,Cell Diameter (mean),\
-                    Cell Diameter (std. dev.),Cell Aspect Ratio (mean),\
-                    Cell Aspect Ratio (std. dev.),ROI Cell Count (mean),\
-                    ROI Cell Count (std. dev.),";
+    data_stream << "Image,Z Layer,Cell Count,Neural Cell Count,Astrocyte Count,\
+                    Neural Cell Diameter (mean),Neural Cell Diameter (std. dev.),\
+                    Neural Cell Aspect Ratio (mean),Neural Cell Aspect Ratio (std. dev.),\
+                    ROI Neural Cell Count (mean),ROI Neural Cell Count (std. dev.),\
+                    Astrocyte Diameter (mean),Astrocyte Diameter (std. dev.),\
+                    Astrocyte Aspect Ratio (mean),Astrocyte Aspect Ratio (std. dev.),\
+                    ROI Astrocyte Count (mean),ROI Astrocyte Count (std. dev.),";
 
     data_stream << "Green-Red Contour Count,";
     for (unsigned int i = 0; i < NUM_AREA_BINS-1; i++) {
